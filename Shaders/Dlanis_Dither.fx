@@ -1,5 +1,5 @@
-/// SPDX-License-Identifier: MPL-2.0
-/// Copyright 2025 Danil Bagautdinov
+// SPDX-FileCopyrightText: © 2025 Danil Bagautdinov
+// SPDX-License-Identifier: MPL-2.0
 
 #include "ReShade.fxh"
 
@@ -21,13 +21,26 @@ uniform float uMean <
 //   ui_tooltip = "";
 > = 0.5;
 
+uniform bool uAnimated <
+    ui_category = "Dither";
+    ui_type = "radio";
+    ui_label = "Animated";
+> = true;
+
+uniform bool uColored <
+    ui_category = "Dither";
+    ui_type = "radio";
+    ui_label = "Colored";
+> = true;
+
 
 uniform uint uFrameCount < source = "framecount"; >;
 
 
 float3 DitherPS(float4 position : SV_Position, float2 texcoord : TEXCOORD) : SV_TARGET {
     float3 color = (tex2Dlod(ReShade::BackBuffer, float4(texcoord, 0.0, 0.0)).rgb);
-    float3 dither = BlueNoise(uint2(position.xy) + Hash1(uFrameCount).xy, 0).rgb;
+    // float3 dither = BlueNoise(uint2(position.xy) + Hash1(uFrameCount).xy, 0).rgb;
+    float3 color_dither = BlueNoiseColorDither(vpos.xy, uFrameCount, 0, uAnimated, uColored);
     return (color + (dither - uMean) * uAmount);
 }
 

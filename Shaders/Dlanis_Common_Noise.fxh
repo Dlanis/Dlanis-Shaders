@@ -1,5 +1,5 @@
-/// SPDX-License-Identifier: MPL-2.0
-/// Copyright 2025 Danil Bagautdinov
+// SPDX-FileCopyrightText: © 2025 Danil Bagautdinov
+// SPDX-License-Identifier: MPL-2.0
 
 #pragma once
 
@@ -52,7 +52,7 @@ uint4 Hash1(uint x) {
     return o;
 }
 
-/// Based on Phi Noise 
+/// Based on Phi Noise
 /// Lincense: CC0 (https://creativecommons.org/publicdomain/zero/1.0)
 /// https://www.shadertoy.com/view/wltSDn
 uint PhiNoise(uint2 uv) {

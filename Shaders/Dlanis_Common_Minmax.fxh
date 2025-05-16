@@ -1,5 +1,5 @@
-/// SPDX-License-Identifier: MPL-2.0
-/// Copyright 2025 Danil Bagautdinov
+// SPDX-FileCopyrightText: © 2025 Danil Bagautdinov
+// SPDX-License-Identifier: MPL-2.0
 
 #pragma once
 

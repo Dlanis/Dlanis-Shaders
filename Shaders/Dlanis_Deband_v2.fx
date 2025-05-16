@@ -1,10 +1,9 @@
 // SPDX-FileCopyrightText: © 2025 Danil Bagautdinov
 // SPDX-License-Identifier: MPL-2.0
 
-// #ifndef DIRECTIONS
-//     // Number of directions
-//     #define DIRECTIONS 1
-// #endif
+#ifndef DUAL_SEARCH
+    #define DUAL_SEARCH 1
+#endif
 
 
 #include "ReShade.fxh"
@@ -32,7 +31,7 @@ uniform uint uColorBitDepthDetection <
 uniform float uManualColorBitDepth <
     ui_type = "slider";
     ui_label = "Manual Color Bit Depth";
-    ui_min = 4;
+    ui_min = 1;
     ui_max = 16;
     ui_step = 0.1;
 > = BUFFER_COLOR_BIT_DEPTH;
@@ -49,7 +48,7 @@ uniform float uSkyColorBitDepth <
     ui_category = "Sky";
     ui_type = "slider";
     ui_label = "Sky Color Bit Depth";
-    ui_min = 4;
+    ui_min = 1;
     ui_max = 16;
     ui_step = 0.1;
 > = BUFFER_COLOR_BIT_DEPTH;
@@ -63,23 +62,31 @@ uniform float uSkyDepth <
     ui_step = 0.001;
 > = 0.98;
 
-/// Category Steps
+/// Category Search
+uniform uint uDirections <
+    ui_category = "Search";
+    ui_type = "slider";
+    ui_label = "Number of Directions";
+    ui_min = 1;
+    ui_max = 2;
+> = 1;
+
 uniform uint uSteps <
     ui_category = "Search";
     ui_type = "slider";
     ui_label = "Number of Steps";
-    ui_min = 2;
+    ui_min = 1;
     ui_max = 16;
-> = 2;
+> = 3;
 
 uniform float uStepSize <
     ui_category = "Search";
     ui_type = "slider";
     ui_label = "Step Size";
-    ui_min = 2;
+    ui_min = 1;
     ui_max = 256;
     ui_step = 1;
-> = 8;
+> = 4;
 
 /// Category Dither
 uniform float uDitherAmount <
@@ -109,6 +116,11 @@ uniform bool uTriangularDither <
     ui_label = "Triangular Dither";
 > = true;
 
+// uniform bool uTest <
+//     ui_category = "Test";
+//     ui_type = "radio";
+//     ui_label = "Test";
+// > = true;
 
 uniform uint uFrameCount < source = "framecount"; >;
 
@@ -134,29 +146,20 @@ float3 DebandPS(float4 vpos : SV_Position, float2 texcoord : TexCoord) : SV_Targ
     }
     float bit_size = rcp(exp2(bit_depth) - 1.0);
 
-    /*
-    uint2 dither_pos = uint2(vpos.xy);
-    if(uAnimatedDither) dither_pos += Hash1(uFrameCount).xy;
-    uint dither_frame = 0;
-    float3 color_dither;
-    if(uColoredDither) {
-        color_dither = BlueNoise(dither_pos, dither_frame++).xyz;
-    } else {
-        color_dither = BlueNoise(dither_pos, dither_frame++).www;
-    }
-    */
-
     uint3 dither_pos = uint3(vpos.xy, 0);
     if(uAnimatedDither) dither_pos.z = uFrameCount;
     uint dither_frame = 0;
-    float3 color_dither;
-    if(uColoredDither) {
-        color_dither.r = BlueNoiseExp0101(dither_pos, dither_frame++).x;
-        color_dither.g = BlueNoiseExp0101(dither_pos, dither_frame++).x;
-        color_dither.b = BlueNoiseExp0101(dither_pos, dither_frame++).x;
-    } else {
-        color_dither = BlueNoiseExp0101(dither_pos, dither_frame++).xxx;
-    }
+
+    // float3 color_dither;
+    // if(uColoredDither) {
+    //     color_dither.r = BlueNoiseExp0101(dither_pos, dither_frame++).x;
+    //     color_dither.g = BlueNoiseExp0101(dither_pos, dither_frame++).x;
+    //     color_dither.b = BlueNoiseExp0101(dither_pos, dither_frame++).x;
+    // } else {
+    //     color_dither = BlueNoiseExp0101(dither_pos, dither_frame++).xxx;
+    // }
+
+    float3 color_dither = BlueNoiseColorDither(vpos.xy, uFrameCount, dither_frame, uAnimatedDither, uColoredDither);
 
     if(uTriangularDither) {
         color_dither = TriangularizeNoise(color_dither)*2.0 - 0.5;
@@ -169,48 +172,71 @@ float3 DebandPS(float4 vpos : SV_Position, float2 texcoord : TexCoord) : SV_Targ
         return original + color_dither;
     }
 
-    float4 mean = float4(original * exp2(-32.0), exp2(-32.0));
-    [unroll]
-    for(uint i = 1; i <= DIRECTIONS; i++) {
-        // float2 dither = BlueNoise(dither_pos, dither_frame++).xy;
-        float2 dither;
-        dither.x = BlueNoiseExp0101(dither_pos, dither_frame++);
-        dither.y = BlueNoiseExp0101(dither_pos, dither_frame++);
+    float2 offset_dither;
+    float2 direction;
 
-        float2 direction;
-        sincos((dither.x + float(i)/float(DIRECTIONS)) * TAU, direction.x, direction.y);
+    float angle_dither = BlueNoiseExp0101(dither_pos, dither_frame++).x;
+    offset_dither = BlueNoiseExp0101(dither_pos, dither_frame++).x;
+    sincos(angle_dither*TAU, direction.x, direction.y);
+    offset_dither.y = 1.0 - offset_dither.y;
+    offset_dither = 1.0 - sqrt(1.0 - offset_dither);
 
-        float3 last = original;
+    float4 mean[2];
+    [loop]
+    for(uint d = 0; d < uDirections; d++) {
+        float offset = uStepSize;
+        float size = uStepSize;
+        float3 last[2] = {original, original};
         [loop]
         for(uint i = 0; i < uSteps; i++) {
-            float offset = float(i) + dither.y;
+            int2 s0_off = int2((offset - size*offset_dither.x) * direction);
+            int2 s1_off = int2((offset - size*offset_dither.y) * direction);
+            int2 s0_pos = clamp(int2(vpos.xy) + s0_off, 0, int2(BUFFER_WIDTH-1, BUFFER_HEIGHT-1));
+            int2 s1_pos = clamp(int2(vpos.xy) - s1_off, 0, int2(BUFFER_WIDTH-1, BUFFER_HEIGHT-1));
+            float3 s0 = tex2Dfetch(ReShade::BackBuffer, s0_pos);
+            float3 s1 = tex2Dfetch(ReShade::BackBuffer, s1_pos);
 
-            int2 sample_position = int2(vpos.xy + offset * direction * uStepSize);
-            sample_position = clamp(sample_position, 0, int2(BUFFER_WIDTH-1, BUFFER_HEIGHT-1));
-            float3 scatter = tex2Dfetch(ReShade::BackBuffer, sample_position).rgb;
+            #if DUAL_SEARCH <= 0
+                s1_pos = s0_pos;
+                s1 = s0;
+            #endif
 
-            float4 diff = float4(abs(last - scatter), 0.0);
-            diff.w = MaxC(diff.rgb);
+            float2 diff;
+            diff.x = MaxC(abs(s0 - last[0]));
+            diff.y = MaxC(abs(s1 - last[1]));
+            bool factor = MaxC(diff) <= bit_size;
 
-            float factor = float(diff.w < 1.5*bit_size);
+            [flatten]
+            if(factor) {
+                float ww = size*sqrt(offset);
+                last[0] = s0;
+                last[1] = s1;
+                mean[d].rgb += s0*ww + s1*ww;
+                mean[d].w += 2*ww;
+            }
 
-            if(factor < 0.01) {
+            if(!factor) {
                 break;
             }
 
-            factor *= offset;
-
-            last = lerp(last, scatter, factor);
-            mean.rgb += scatter * factor;
-            mean.w += factor;
+            size += size;
+            offset += size;
         }
+        direction = float2(direction.y, -direction.x);
     }
 
-    return mean.rgb * rcp(mean.w) + color_dither;
+    float4 choosen_mean;
+    if(uDirections > 1) {
+        choosen_mean = mean[0].w > mean[1].w ? mean[0] : mean[1];
+    } else {
+        choosen_mean = mean[0];
+    }
+
+    return (choosen_mean.w > 1e-6 ? (choosen_mean.rgb * rcp(choosen_mean.w)) : original) + color_dither;
 }
 
 technique Dlanis_Deband <
-    ui_label = "Dlanis Deband";
+    ui_label = "Dlanis Deband v2";
     ui_tooltip = "Tries to hide color banding by searching gradients.";
 > {
     pass {

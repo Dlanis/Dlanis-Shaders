@@ -1,5 +1,5 @@
-/// SPDX-License-Identifier: MPL-2.0
-/// Copyright 2025 Danil Bagautdinov
+// SPDX-FileCopyrightText: © 2025 Danil Bagautdinov
+// SPDX-License-Identifier: MPL-2.0
 
 #ifndef RECOMPILE
     #define RECOMPILE 0
@@ -86,13 +86,13 @@ float ColorDifference(float3 a, float3 b) {
 // float ColorDifferenceOklab(float3 a, float3 b) {
 //     float3 a_ = Oklab_from_Linear_sRGB(Linear_sRGB_from_sRGB(a));
 //     float3 b_ = Oklab_from_Linear_sRGB(Linear_sRGB_from_sRGB(b));
-// 
+//
 //     return length(a_ - b_);
 // }
 
 float2 EdgeDetectionPS(in float4 position : SV_Position, in float2 texCoord : TEXCOORD) : SV_Target {
     //      NN
-    //      N 
+    //      N
     // WW W C E
     //      S
     // float3 C  = RGB_to_YCoCgR(tex2Dlod(ReShade::BackBuffer, float4(texCoord, 0.0, 0.0), int2( 0,  0)).rgb);
@@ -288,7 +288,7 @@ float4 EdgeWeightsCalculationPS(in float4 position : SV_Position) : SV_Target {
 
     const int maxSearchLength = 64;
 
-#if 1
+#if 0
 
     int2 C;
     /// C.x YUpRight
@@ -329,10 +329,11 @@ float4 EdgeWeightsCalculationPS(in float4 position : SV_Position) : SV_Target {
     }
     if(C.x == 0 || C.y == 0) discard;
     float2 U;
-    // {
-    //     U.y = -abs(C.x);
-    //     U.x = C.x < 0 ? 0.5 : 0;
-    // }
+    {
+        U.y = -abs(C.x);
+        U.x = C.x < 0 ? 0.5 : 0;
+    }
+    if(false)
     {
         if(C.x > 0) {
             U.y = -C.x;
@@ -388,6 +389,150 @@ float4 EdgeWeightsCalculationPS(in float4 position : SV_Position) : SV_Target {
         D.x = C.y > 0 ? -0.5 : 0;
     }
 
+#elif 0
+
+    float2 U, D;
+    float C;
+    float ui, uj, uli, ud, ul;
+    float di, dj, dli, dd, dl;
+    bool udone, ddone;
+
+    while(ui < maxSearchLength && di < maxSearchLength) {
+        if(!udone) {
+            float2 edge = tex2Dfetch(sEdge, pos + int2(uj, -ui)).xy;
+            float2 edgeNE = tex2Dfetch(sEdge, pos + int2(uj, -ui) + int2(1, -1)).xy;
+
+            float cd = (ul - C + 1) * (uj != 0);
+            if(edge.y && cd < 1.5) {
+                if(edge.x && edgeNE.y) {
+                    U = float2(uj, -ui);
+                    uli = ui+1;
+                }
+                C += (uj==0);
+                ui++;
+                ul++;
+            } else {
+                if(uli && cd > -1.5) {
+                    // if(SignNo0(ud) != SignNo0(cd) || cd < -1.5) {
+                    //     break;
+                    // }
+                    ud += cd;
+
+                    ui = uli;
+                    uj++;
+                    uli = 0;
+                    ul = 0;
+                } else {
+                    break;
+                }
+            }
+        }
+        if(!ddone) {
+            float2 edge = tex2Dfetch(sEdge, pos + int2(-dj, di)).xy;
+            float2 edgeSW = tex2Dfetch(sEdge, pos + int2(-dj, di) + int2(-1, 1)).xy;
+
+            float cd = (dl - C + 1) * (uj != 0);
+            if(edge.y && cd < 1.5) {
+                if(edgeSW.x && edgeSW.y) {
+                    D = float2(-dj, di);
+                    dli = di+1;
+                }
+                C += (dj==0);
+                di++;
+                dl++;
+            } else {
+                if(dli && cd > -1.5) {
+                    // if(SignNo0(dd) != SignNo0(cd) || cd < -1.5) {
+                    //     break;
+                    // }
+                    dd += cd;
+
+                    di = dli;
+                    dj++;
+                    dli = 0;
+                    dl = 0;
+                } else {
+                    break;
+                }
+            }
+        }
+    }
+
+#elif 1
+
+    float2 U, D;
+    float C;
+    float ud, dd, j, ui, di;
+
+    while(j < 3) {
+        float ul, dl;
+        {
+            float i = ui, li;
+            float2 edge = tex2Dfetch(sEdge, pos + int2(j, -i)).xy, edgeNE;
+            while(i < maxSearchLength && edge.y > 0.9 && (i-ui-C < 1.5 || j == 0)) {
+                edgeNE = tex2Dfetch(sEdge, pos + int2(j, -i) + int2(1, -1)).xy;
+
+                li = (edge.x > 0.9 && edgeNE.y > 0.9) ? i+1 : li;
+                i++;
+
+                edge = tex2Dfetch(sEdge, pos + int2(j, -i)).xy;
+            }
+
+            ul = (li > 0) ? ui-li : i-ui;
+            ui = (li > 0) ? li : i;
+        }
+        {
+            float i = di, li;
+            float2 edge = tex2Dfetch(sEdge, pos + int2(-j, i)).xy, edgeSW;
+            while(i < maxSearchLength && edge.y > 0.9 && (i-di-C < 1.5 || j == 0)) {
+                edgeSW = tex2Dfetch(sEdge, pos + int2(-j, i) + int2(-1, 1)).xy;
+
+                li = (edgeSW.x > 0.9 && edgeSW.y > 0.9) ? i+1 : li;
+                i++;
+
+                edge = tex2Dfetch(sEdge, pos + int2(-j, i)).xy;
+            }
+
+            dl = (li > 0) ? di-li : i-di;
+            di = (li > 0) ? li : i;
+        }
+        C = (j == 0) ? abs(ul)+abs(dl)-1 : C;
+
+        [flatten]
+        if(j != 0) {
+            float ulc = abs(ul)-C;
+            float dlc = abs(dl)-C;
+            float sud = clamp(ud, -1, 1);
+            float sdd = clamp(dd, -1, 1);
+
+            if(false
+               || ul == 0
+               || dl == 0
+               || abs(ulc) > 1.5
+               || abs(dlc) > 1.5
+            //    || abs(ulc - sud) > 1.5
+            //    || abs(dlc - sdd) > 1.5
+            //    || abs(sud - sdd) > 1.5
+            //    || abs(ud-dd) > 2.5
+               ) {
+                break;
+            }
+
+            ud += ulc;
+            dd += dlc;
+        }
+
+        U.y = -ui+1;
+        //U.x = j + (ul < 0 ? 0.5 : 0);
+        U.x = j;
+
+        D.y = di-1;
+        //D.x = -(j + (dl < 0 ? 0.5 : 0));
+        D.x = -j;
+
+        j++;
+    }
+
 #else
 
     float2 U;
@@ -435,8 +580,8 @@ float4 EdgeWeightsCalculationPS(in float4 position : SV_Position) : SV_Target {
 
     float4 weights;
     if(U.x - D.x > 0.1) {
-        U.y += 0.5;
-        D.y -= 0.5;
+        // U.y += 0.5;
+        // D.y -= 0.5;
         float y0 = LineY(D, U, 0);
         if(-0.5 < y0 && y0 < 0.5) {
             weights.x = -(-0.5-y0)*LineX(D, U, -0.5);
@@ -447,12 +592,13 @@ float4 EdgeWeightsCalculationPS(in float4 position : SV_Position) : SV_Target {
         }
     }
 
-    // weights.xy = abs(C.xy)*uLambda;
-    // weights.z = C.x < 0;
-    // weights.w = C.y < 0;
-    // weights.x = U.y;
-    // weights.y = 0.0;
-    // weights *= uLambda;
+#if 0
+    weights = 0;
+    // weights.x = abs(C.x)+abs(C.y)-1;
+    weights.y = abs(U.y) == 1;
+    // weights.w = di;
+    weights *= uLambda;
+#endif
 
     // for(int i = 0; i < 32; i++) {
     //     float2 edge = tex2Dfetch(sEdge, pos + float2(0.0, -i)).xy;
@@ -522,7 +668,7 @@ float3 MainPS(in float4 position : SV_Position, in float2 texCoord : TEXCOORD) :
                 return 0.5;
         }
     } else if(uRenderMode == 2) {
-        switch(uTestRender) { 
+        switch(uTestRender) {
             case 0:
                 return float3(centerBlendWeights.xy, 0.0);//*uLambda;
             case 1:
@@ -534,11 +680,11 @@ float3 MainPS(in float4 position : SV_Position, in float2 texCoord : TEXCOORD) :
 
     // return float4(RGB_to_YCoCgR(tex2Dlod(ReShade::BackBuffer, float4(texCoord, 0.0, 0.0)).rgb), 0.0);
 
-    float3 C = tex2Dlod(ReShade::BackBuffer, float4(texCoord, 0.0, 0.0), int2( 0,  0)).rgb;
-    float3 N = tex2Dlod(ReShade::BackBuffer, float4(texCoord, 0.0, 0.0), int2( 0, -1)).rgb;
-    float3 E = tex2Dlod(ReShade::BackBuffer, float4(texCoord, 0.0, 0.0), int2( 1,  0)).rgb;
-    float3 S = tex2Dlod(ReShade::BackBuffer, float4(texCoord, 0.0, 0.0), int2( 0,  1)).rgb;
-    float3 W = tex2Dlod(ReShade::BackBuffer, float4(texCoord, 0.0, 0.0), int2(-1,  0)).rgb;
+    float3 C = Linear_sRGB_from_sRGB(tex2Dlod(ReShade::BackBuffer, float4(texCoord, 0.0, 0.0), int2( 0,  0)).rgb);
+    float3 N = Linear_sRGB_from_sRGB(tex2Dlod(ReShade::BackBuffer, float4(texCoord, 0.0, 0.0), int2( 0, -1)).rgb);
+    float3 E = Linear_sRGB_from_sRGB(tex2Dlod(ReShade::BackBuffer, float4(texCoord, 0.0, 0.0), int2( 1,  0)).rgb);
+    float3 S = Linear_sRGB_from_sRGB(tex2Dlod(ReShade::BackBuffer, float4(texCoord, 0.0, 0.0), int2( 0,  1)).rgb);
+    float3 W = Linear_sRGB_from_sRGB(tex2Dlod(ReShade::BackBuffer, float4(texCoord, 0.0, 0.0), int2(-1,  0)).rgb);
 
     // C = lerp(C, W, saturate(centerBlendWeights.x*2.0 - 1.0));
     // C = lerp(C, E, saturate(-eastBlendWeights.x*2.0 + 1.0));
@@ -560,7 +706,7 @@ float3 MainPS(in float4 position : SV_Position, in float2 texCoord : TEXCOORD) :
     // // return 2*C - W - E;
     // // return float3(C.yz*0.5 + 0.5, 0.0);
 
-    return C;
+    return sRGB_from_Linear_sRGB(C);
 }
 
 

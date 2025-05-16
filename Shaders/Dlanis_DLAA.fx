@@ -1,5 +1,5 @@
-/// SPDX-License-Identifier: MPL-2.0
-/// Copyright 2025 Danil Bagautdinov
+// SPDX-FileCopyrightText: © 2025 Danil Bagautdinov
+// SPDX-License-Identifier: MPL-2.0
 
 #ifndef ONE_PASS_BLUR
     #define ONE_PASS_BLUR 0
@@ -297,7 +297,7 @@ float2 EdgePS(float4 position : SV_Position, float2 texCoord : TEXCOORD) : SV_TA
             derivatives[k] = float4(Lxx, Lxy, Lyy, center);
         }
     }
-    
+
     float4 North = derivatives[0];
     float4 East  = derivatives[1];
     float4 South = derivatives[2];
@@ -324,7 +324,7 @@ float2 EdgePS(float4 position : SV_Position, float2 texCoord : TEXCOORD) : SV_TA
     // */
 }
 
-float3 DLAAPS(float4 position : SV_Position, float2 texCoord : TEXCOORD) : SV_TARGET {    
+float3 DLAAPS(float4 position : SV_Position, float2 texCoord : TEXCOORD) : SV_TARGET {
     float3 center = tex2Dlod(ReShade::BackBuffer, float4(texCoord, 0.0, 0.0)).rgb;
     float centerLuma = tex2Dlod(sLuma, float4(texCoord, 0.0, 0.0)).x;
     float centerBlurredLuma = tex2Dlod(sBlurredLuma, float4(texCoord, 0.0, 0.0)).x;
@@ -342,7 +342,7 @@ float3 DLAAPS(float4 position : SV_Position, float2 texCoord : TEXCOORD) : SV_TA
         for(int i = -4; i <= 4; i+=1) {
             if(i == 0) continue;
 
-            float2 offset = float2(BUFFER_PIXEL_SIZE.x*(float(3*i-i*(abs(i)==1)) - 0.5*sign(i)), 0.0);
+            float2 offset = float2(BUFFER_PIXEL_SIZE.x*(float(3*i-sign(i)) - 0.5*sign(i)), 0.0);
             H[i+4].rgb = tex2Dlod(ReShade::BackBuffer, float4(texCoord + offset, 0.0, 0.0)).rgb;
             float2 e = tex2Dlod(sEdge, float4(texCoord + offset, 0.0, 0.0)).xy;
             H[i+4].w = abs(e.y);
@@ -360,7 +360,7 @@ float3 DLAAPS(float4 position : SV_Position, float2 texCoord : TEXCOORD) : SV_TA
         for(int i = -4; i <= 4; i+=1) {
             if(i == 0) continue;
 
-            float2 offset = float2(0.0, BUFFER_PIXEL_SIZE.y*(float(3*i-i*(abs(i)==1)) - 0.5*sign(i)));
+            float2 offset = float2(0.0, BUFFER_PIXEL_SIZE.y*(float(3*i-sign(i)) - 0.5*sign(i)));
             V[i+4].rgb = tex2Dlod(ReShade::BackBuffer, float4(texCoord + offset, 0.0, 0.0)).rgb;
             float2 e = tex2Dlod(sEdge, float4(texCoord + offset, 0.0, 0.0)).xy;
             V[i+4].w = abs(e.x);
@@ -455,7 +455,7 @@ float3 DLAAPS(float4 position : SV_Position, float2 texCoord : TEXCOORD) : SV_TA
             [unroll]
             for(int i = -2; i <= 2; i++) {
                 [unroll]
-                for(int j = -2; j <= 2; j++) { 
+                for(int j = -2; j <= 2; j++) {
                     float2 offset = float2(
                         float(i*2) - 0.5*sign(i),
                         float(j*2) - 0.5*sign(j)
@@ -539,7 +539,7 @@ technique Dlanis_DLAA <
     pass BlurLumaV {
         VertexShader = PostProcessVS;
         PixelShader = BlurLumaVPS;
-        RenderTarget0 = tBlurredLuma;        
+        RenderTarget0 = tBlurredLuma;
     }
 #else
     pass BlurLuma
