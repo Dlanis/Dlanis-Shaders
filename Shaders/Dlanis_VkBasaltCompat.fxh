@@ -1,6 +1,6 @@
 /// SPDX-License-Identifier: MPL-2.0
-/// Copyright 2024 Danil Bagautdinov
+/// Copyright 2025 Danil Bagautdinov
 
 #ifndef BUFFER_COLOR_BIT_DEPTH
-#   define BUFFER_COLOR_BIT_DEPTH 8
+    #define BUFFER_COLOR_BIT_DEPTH 8
 #endif
