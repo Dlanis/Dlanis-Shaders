@@ -170,15 +170,16 @@ float3 DebandPS(float4 vpos : SV_Position, float2 texcoord : TexCoord) : SV_Targ
     }
 
     float4 mean = float4(original * exp2(-32.0), exp2(-32.0));
-    [unroll]
-    for(uint i = 1; i <= DIRECTIONS; i++) {
+    // [unroll]
+    // for(uint i = 1; i <= DIRECTIONS; i++) {
         // float2 dither = BlueNoise(dither_pos, dither_frame++).xy;
         float2 dither;
         dither.x = BlueNoiseExp0101(dither_pos, dither_frame++);
         dither.y = BlueNoiseExp0101(dither_pos, dither_frame++);
 
         float2 direction;
-        sincos((dither.x + float(i)/float(DIRECTIONS)) * TAU, direction.x, direction.y);
+        // sincos((dither.x + float(i)/float(DIRECTIONS)) * TAU, direction.x, direction.y);
+        sincos(dither.x * TAU, direction.x, direction.y);
 
         float3 last = original;
         [loop]
@@ -204,7 +205,7 @@ float3 DebandPS(float4 vpos : SV_Position, float2 texcoord : TexCoord) : SV_Targ
             mean.rgb += scatter * factor;
             mean.w += factor;
         }
-    }
+    // }
 
     return mean.rgb * rcp(mean.w) + color_dither;
 }

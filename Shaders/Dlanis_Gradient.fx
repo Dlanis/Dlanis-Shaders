@@ -8,7 +8,11 @@ uniform uint uQuant = 64.0;
 
 
 float3 GradientPS(float4 position : SV_Position, float2 texcoord : TEXCOORD) : SV_TARGET {
-    return floor(frac(texcoord.y*uScale)*(uQuant+1))*rcp(uQuant);
+    float g;
+    // g=texcoord.y;
+    g=texcoord.x;
+    // g=length(texcoord - float2(0.5,0.5));
+    return floor(frac(g*uScale)*(uQuant+1))*rcp(uQuant);
 }
 
 

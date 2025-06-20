@@ -177,10 +177,13 @@ float3 DebandPS(float4 vpos : SV_Position, float2 texcoord : TexCoord) : SV_Targ
 
     float angle_dither = BlueNoiseExp0101(dither_pos, dither_frame++).x;
     offset_dither = BlueNoiseExp0101(dither_pos, dither_frame++).x;
-    sincos(angle_dither*TAU, direction.x, direction.y);
+    #if DUAL_SEARCH <= 0
+        sincos(angle_dither*TAU, direction.x, direction.y);
+    #else
+        sincos(angle_dither*PI, direction.x, direction.y);
+    #endif
     offset_dither.y = 1.0 - offset_dither.y;
     offset_dither = 1.0 - sqrt(1.0 - offset_dither);
-
     float4 mean[2];
     [loop]
     for(uint d = 0; d < uDirections; d++) {

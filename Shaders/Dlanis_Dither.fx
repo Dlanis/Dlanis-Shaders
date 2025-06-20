@@ -40,8 +40,9 @@ uniform uint uFrameCount < source = "framecount"; >;
 float3 DitherPS(float4 position : SV_Position, float2 texcoord : TEXCOORD) : SV_TARGET {
     float3 color = (tex2Dlod(ReShade::BackBuffer, float4(texcoord, 0.0, 0.0)).rgb);
     // float3 dither = BlueNoise(uint2(position.xy) + Hash1(uFrameCount).xy, 0).rgb;
-    float3 color_dither = BlueNoiseColorDither(vpos.xy, uFrameCount, 0, uAnimated, uColored);
-    return (color + (dither - uMean) * uAmount);
+    uint n = 0;
+    float3 color_dither = BlueNoiseColorDither(position.xy, uFrameCount, n, uAnimated, uColored);
+    return (color + (color_dither - uMean) * uAmount);
 }
 
 
